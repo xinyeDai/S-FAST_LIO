@@ -109,9 +109,13 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg)
     }
 
     PointCloudXYZI::Ptr ptr(new PointCloudXYZI());
+    // 通过process把msg的消息类型转换为 PointCloudXYZI::Ptr
     p_pre->process(msg, ptr);
+    // 再把ptr点云push到LiDAR_buffer里面，lidar_buffer是一个队列deque
     lidar_buffer.push_back(ptr);
+    // 时间戳push到timebuffer里面去
     time_buffer.push_back(msg->header.stamp.toSec());
+    // 把lasttimestamp替换成我们最新一帧的时间戳
     last_timestamp_lidar = msg->header.stamp.toSec();
     mtx_buffer.unlock();
     sig_buffer.notify_all();
@@ -124,6 +128,7 @@ void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg)
     mtx_buffer.lock();
     double preprocess_start_time = omp_get_wtime();
     scan_count++;
+    // 判断新数据的时间戳是否正确
     if (msg->header.stamp.toSec() < last_timestamp_lidar)
     {
         ROS_ERROR("lidar loop back, clear buffer");
@@ -173,14 +178,16 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
 
     mtx_buffer.lock();
 
+    // 判断新进的IMU时间戳小于上次的IMU时间戳，则有问题
     if (timestamp < last_timestamp_imu)
     {
         ROS_WARN("imu loop back, clear buffer");
         imu_buffer.clear();
     }
-
+    // 把last_stamp换成新的时间戳
     last_timestamp_imu = timestamp;
 
+    // 新的msg，push到imu_buffer里面，imu_buffer是一个队列(deque)
     imu_buffer.push_back(msg);
     mtx_buffer.unlock();
     sig_buffer.notify_all();
@@ -188,7 +195,7 @@ void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
 
 double lidar_mean_scantime = 0.0;
 int scan_num = 0;
-//把当前要处理的LIDAR和IMU数据打包到meas
+// 把当前要处理的LIDAR和IMU数据打包到meas
 bool sync_packages(MeasureGroup &meas)
 {
     if (lidar_buffer.empty() || imu_buffer.empty())
