@@ -152,12 +152,15 @@ void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg)
     sig_buffer.notify_all();
 }
 
+// 输入sensor_msgs::Imu消息类型
 void imu_cbk(const sensor_msgs::Imu::ConstPtr &msg_in)
 {
     publish_count++;
     // cout<<"IMU got at: "<<msg_in->header.stamp.toSec()<<endl;
-    sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));
+    sensor_msgs::Imu::Ptr msg(new sensor_msgs::Imu(*msg_in));  // 定义一个sensor imu msgs指针
 
+    // 判断timediff_lidar_wrt_imu雷达和IMU之间是否有时间差值，差值在yml文件中的 time_offset_lidar_to_imu，time_sync_en表示时间同步开关  （不是同一个时间系统,需要转换到同一个时间系统）
+    // 这里存疑 timediff_lidar_wrt_imu 和 time_diff_lidar_to_imu 都是雷达和IMU的时间差，怎么区分
     if (abs(timediff_lidar_wrt_imu) > 0.1 && time_sync_en)
     {
         msg->header.stamp =
