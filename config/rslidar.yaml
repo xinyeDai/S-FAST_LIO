@@ -18,8 +18,9 @@ mapping:
     fov_degree:    180
     det_range:     100.0
     extrinsic_est_en:  true      # true: enable the online estimation of IMU-LiDAR extrinsic,
-    init_pos: [1.0, 1.0, 1.0]
-    init_rot: [0, 0, 0, 1]
+    # 重定位参数
+    init_pos: [1.0, 1.0, 1.0]  # 重定位初始xyz位置，初始应该给0，然后根据重定位结果调整（无全局位姿地图情况）
+    init_rot: [0, 0, 0, 1]     # 重定位初始四元数
     extrinsic_T: [ 0, 0, -0.1]
     extrinsic_R: [ 1, 0, 0,
                    0, 1, 0,
