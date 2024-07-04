@@ -207,23 +207,25 @@ bool sync_packages(MeasureGroup &meas)
             lidar_end_time = meas.lidar_beg_time + lidar_mean_scantime;
             ROS_WARN("Too few input point cloud!\n");
         }
+        // （毫秒转换成秒）小于0.5倍的雷达平均扫描时间，那就说明雷达数据量比较小，或者有其他问题被遮挡等，则endtime就改成雷达的起始时间加上雷达的平均扫描时间
         else if (meas.lidar->points.back().curvature / double(1000) < 0.5 * lidar_mean_scantime)
         {
             lidar_end_time = meas.lidar_beg_time + lidar_mean_scantime;
-        }
+        } // 前面两个if一般不会执行，除非出问题
         else
-        {
+        {   // 没有问题就是用雷达起始时间加上雷达最后一个点的相对时间
             scan_num++;
             lidar_end_time = meas.lidar_beg_time + meas.lidar->points.back().curvature / double(1000);
+            // 计算一个新的平均扫描时间
             lidar_mean_scantime += (meas.lidar->points.back().curvature / double(1000) - lidar_mean_scantime) / scan_num;
         }
-
+        // 这样meas里面就存了点云，雷达起始时间，雷达终止时间
         meas.lidar_end_time = lidar_end_time;
 
         lidar_pushed = true;
     }
 
-    if (last_timestamp_imu < lidar_end_time)
+    if (last_timestamp_imu < lidar_end_time)  //如果最新的imu时间戳小于雷达的最终时间，证明imu数据没有收集足够，则break
     {
         return false;
     }
@@ -231,14 +233,17 @@ bool sync_packages(MeasureGroup &meas)
     /*** push imu data, and pop from imu buffer ***/
     double imu_time = imu_buffer.front()->header.stamp.toSec();
     meas.imu.clear();
+    // 判断imu buffer不能是空的，其次imu时间必须小于雷达endtime
     while ((!imu_buffer.empty()) && (imu_time < lidar_end_time))
     {
+        // imutime等于imubuffer的第一个时间
         imu_time = imu_buffer.front()->header.stamp.toSec();
         if (imu_time > lidar_end_time)
             break;
+        // 把imubuffer加到meas里面，再把原来的imubuffer的第一个值删掉
         meas.imu.push_back(imu_buffer.front());
         imu_buffer.pop_front();
-    }
+    }  // 一直到imutime大于雷达time时候，跳出，表示本次数据已经打包好了
 
     lidar_buffer.pop_front();
     time_buffer.pop_front();
