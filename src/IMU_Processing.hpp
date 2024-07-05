@@ -42,8 +42,8 @@ class ImuProcess
   ImuProcess();
   ~ImuProcess();
   
-  void Reset();
-  void set_param(const V3D &transl, const M3D &rot, const V3D &gyr, const V3D &acc, const V3D &gyr_bias, const V3D &acc_bias);
+  void Reset();  // 重置IMU 的所有变量
+  void set_param(const V3D &transl, const M3D &rot, const V3D &gyr, const V3D &acc, const V3D &gyr_bias, const V3D &acc_bias);  // 设置变量
   Eigen::Matrix<double, 12, 12> Q;    //噪声协方差矩阵  对应论文式(8)中的Q
   void Process(const MeasureGroup &meas, esekfom::esekf &kf_state, PointCloudXYZI::Ptr &pcl_un_);
 
@@ -120,11 +120,11 @@ void ImuProcess::set_param(const V3D &transl, const M3D &rot, const V3D &gyr, co
 }
 
 
-//IMU初始化：利用开始的IMU帧的平均值初始化状态量x
+//IMU初始化：利用开始的IMU帧的平均值初始化状态量x  N是最大迭代次数
 void ImuProcess::IMU_init(const MeasureGroup &meas, esekfom::esekf &kf_state, int &N)
 {
   //MeasureGroup这个struct表示当前过程中正在处理的所有数据，包含IMU队列和一帧lidar的点云 以及lidar的起始和结束时间
-  //初始化重力、陀螺仪偏差、acc和陀螺仪协方差  将加速度测量值归一化为单位重力   **/
+  //初始化重力、陀螺仪偏差、acc和陀螺仪协方差  将加速度测量值归一化为单位重力   ，最初的几帧IMU的初始化**/
   V3D cur_acc, cur_gyr;
   
   if (b_first_frame_) //如果为第一帧IMU
@@ -156,14 +156,14 @@ void ImuProcess::IMU_init(const MeasureGroup &meas, esekfom::esekf &kf_state, in
   }
   
   state_ikfom init_state = kf_state.get_x();        //在esekfom.hpp获得x_的状态
-  init_state.grav = - mean_acc / mean_acc.norm() * G_m_s2;    //得平均测量的单位方向向量 * 重力加速度预设值
+  init_state.grav = - mean_acc / mean_acc.norm() * G_m_s2;    //得平均测量的单位方向向量 * 重力加速度预设值   （平均加速度除以他的范数 再 乘重力加速度的预设值）
   
   init_state.bg  = mean_gyr;      //角速度测量作为陀螺仪偏差
   init_state.offset_T_L_I = Lidar_T_wrt_IMU;      //将lidar和imu外参传入
   init_state.offset_R_L_I = Sophus::SO3<double>(Lidar_R_wrt_IMU);
-  kf_state.change_x(init_state);      //将初始化后的状态传入esekfom.hpp中的x_
+  kf_state.change_x(init_state);      //将初始化后的状态传入esekfom.hpp中的x_ （更新）
 
-  Matrix<double, 24, 24> init_P = MatrixXd::Identity(24,24);      //在esekfom.hpp获得P_的协方差矩阵
+  Matrix<double, 24, 24> init_P = MatrixXd::Identity(24,24);      //在esekfom.hpp获得P_的协方差矩阵，P_就是我们私有成员中的协方差矩阵
   init_P(6,6) = init_P(7,7) = init_P(8,8) = 0.00001;
   init_P(9,9) = init_P(10,10) = init_P(11,11) = 0.00001;
   init_P(15,15) = init_P(16,16) = init_P(17,17) = 0.0001;
@@ -302,8 +302,12 @@ void ImuProcess::UndistortPcl(const MeasureGroup &meas, esekfom::esekf &kf_state
 
 
 double T1,T2;
+/* @param meas: 数据打包好的meas；
+   @param kf_state: 存储带优化的状态量；
+   @function: 通过函数做一个前向传播，把待优化的状态量esekf, 把前向传播的状态量赋给 kf_state ，运动补偿后的点云赋给 cur_pcl_un_
+*/
 void ImuProcess::Process(const MeasureGroup &meas, esekfom::esekf &kf_state, PointCloudXYZI::Ptr &cur_pcl_un_)
-{
+{  
   // T1 = omp_get_wtime();
 
   if(meas.imu.empty()) {return;};
@@ -311,7 +315,7 @@ void ImuProcess::Process(const MeasureGroup &meas, esekfom::esekf &kf_state, Poi
 
   if (imu_need_init_)   
   {
-    // The very first lidar frame
+    // The very first lidar frame 
     IMU_init(meas, kf_state, init_iter_num);  //如果开头几帧  需要初始化IMU参数
 
     imu_need_init_ = true;
@@ -320,7 +324,7 @@ void ImuProcess::Process(const MeasureGroup &meas, esekfom::esekf &kf_state, Poi
 
     state_ikfom imu_state = kf_state.get_x();
 
-    if (init_iter_num > MAX_INI_COUNT)
+    if (init_iter_num > MAX_INI_COUNT)  // 迭代次数大于我们的最大迭代次数，IMU初始化结束
     {
       cov_acc *= pow(G_m_s2 / mean_acc.norm(), 2);
       imu_need_init_ = false;
