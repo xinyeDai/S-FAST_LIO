@@ -644,15 +644,16 @@ int main(int argc, char **argv)
                 ROS_WARN("No point, skip this scan!\n");
                 continue;
             }
-
-            state_point = kf.get_x();
+            // 拿到当前的状态量
+            state_point = kf.get_x(); 
+            // 获取雷达的原点在世界坐标系下的位置
             pos_lid = state_point.pos + state_point.rot.matrix() * state_point.offset_T_L_I;
 
             flg_EKF_inited = (Measures.lidar_beg_time - first_lidar_time) < INIT_TIME ? false : true;
 
             lasermap_fov_segment(); //更新localmap边界，然后降采样当前帧点云
 
-            //点云下采样
+            // 点云下采样，输入 feats_undistort 输出 feats_down_body
             downSizeFilterSurf.setInputCloud(feats_undistort);
             downSizeFilterSurf.filter(*feats_down_body);
             feats_down_size = feats_down_body->points.size();
@@ -677,6 +678,7 @@ int main(int argc, char **argv)
                 continue;
             }
 
+            // 是否需要看全局地图
             if (0) // If you need to see map point, change to "if(1)"
             {
                 PointVector().swap(ikdtree.PCL_Storage);
@@ -687,7 +689,8 @@ int main(int argc, char **argv)
             }
 
             /*** iterated state estimation ***/
-            Nearest_Points.resize(feats_down_size); //存储近邻点的vector
+            Nearest_Points.resize(feats_down_size); // 存储一帧点云，每个点的近邻点的vector，初始化大小为上面拿到的点云的大小
+            // 迭代的主函数
             kf.update_iterated_dyn_share_modified(LASER_POINT_COV, feats_down_body, ikdtree, Nearest_Points, NUM_MAX_ITERATIONS, extrinsic_est_en);
 
             state_point = kf.get_x();
