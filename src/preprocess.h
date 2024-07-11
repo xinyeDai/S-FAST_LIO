@@ -15,7 +15,8 @@ enum LID_TYPE
   AVIA = 1,
   VELO16,
   OUST64,
-  RS32
+  RS32,
+  HS64
 }; //{1, 2, 3, 4}
 enum TIME_UNIT
 {
@@ -123,6 +124,20 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(ouster_ros::Point,
     (std::uint32_t, range, range)
 )
 
+// hesai lidar的点云格式
+namespace Hesai_ros {
+  struct EIGEN_ALIGN16 HesaiPointXYZIRT {
+      PCL_ADD_POINT4D;
+      // uint8_t intensity;
+      PCL_ADD_INTENSITY;
+      double timestamp = 0;
+      uint16_t ring = 0;
+      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  };
+}
+POINT_CLOUD_REGISTER_POINT_STRUCT(Hesai_ros::HesaiPointXYZIRT,
+                                  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(double, timestamp, timestamp)(uint16_t, ring, ring))
+
 class Preprocess
 {
   public:
@@ -151,6 +166,7 @@ class Preprocess
   void avia_handler(const livox_ros_driver::CustomMsg::ConstPtr &msg);
   void oust64_handler(const sensor_msgs::PointCloud2::ConstPtr &msg);
   void velodyne_handler(const sensor_msgs::PointCloud2::ConstPtr &msg);
+  void Hesai_handler(const sensor_msgs::PointCloud2::ConstPtr &msg);
   void give_feature(PointCloudXYZI &pl, vector<orgtype> &types);
   void pub_func(PointCloudXYZI &pl, const ros::Time &ct);
   int  plane_judge(const PointCloudXYZI &pl, vector<orgtype> &types, uint i, uint &i_nex, Eigen::Vector3d &curr_direct);
